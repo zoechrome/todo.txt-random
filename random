@@ -1,0 +1,66 @@
+#!/usr/bin/env python
+from datetime import datetime
+import os
+import random
+import re
+import sys
+
+try:
+    from humanize import naturalday
+except ImportError as e:
+    naturalday = lambda x: x.strftime('%Y-%m-%d')
+
+if sys.argv[1] == 'usage':
+    print('  random')
+    print('    Print a random task from your list')
+    print('  random due')
+    print('    Print a random task due on the first due date in your list')
+    print('  random due [offset]')
+    print('    Print a random task due on the [offset] due date in your list')
+    print('')
+    exit()
+
+with open(os.environ['TODO_FILE'], 'r') as f:
+    tasks = f.readlines()
+
+# Add index number to each task
+tasks = ['%02d %s' % task for task in enumerate(tasks, start=1)]
+
+# When the option "due" is specified
+if len(sys.argv) > 2 and sys.argv[2] == 'due':
+    # Stores tuples of (str, datetime)
+    taskDueDates = []
+    for task in tasks:
+        # match due date, e.g. due:2000-12-31
+        match = re.search(r'\bdue:(\d{4}-\d{2}-\d{2})', task)
+        # skip tasks with no due date
+        if match is None: continue
+        dueDate = datetime.strptime(match.group(1), '%Y-%m-%d')
+        taskDueDates.append((task, dueDate))
+    # Sort by due date ascending
+    taskDueDates.sort(key=lambda x: x[1])
+
+    # Find soonest due date
+    date = taskDueDates[0][1]
+
+    if len(sys.argv) > 3:
+        # Find offset due date
+        for i in range(int(sys.argv[3])):
+            for task in taskDueDates:
+                if task[1] > date:
+                    date = task[1]
+                    break
+
+    # Filter list to only contain the right due date
+    taskDueDates = [task for task in taskDueDates if task[1] == date]
+    # Overwrite tasks list
+    tasks = [task[0] for task in taskDueDates]
+    
+    if len(tasks) == 1:
+        print('You have only one task due %s:' % naturalday(date))
+    else:
+        print('Random task due %s:' % naturalday(date))
+else:
+    print('Random task:')
+
+print('  ' + random.choice(tasks), end='')
